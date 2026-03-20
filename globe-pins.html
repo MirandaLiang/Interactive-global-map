@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO · INTEL · NODE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;height:100%;
+  background:#050508;
+  overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Montserrat',sans-serif;
+  color:#fff;
+}
+#stage{
+  position:relative;
+  width:min(90vw,90vh,720px);
+  height:min(90vw,90vh,720px);
+  flex-shrink:0;
+}
+canvas{position:absolute;inset:0;width:100%;height:100%;}
+#c-main{z-index:1;cursor:grab;}
+#c-main:active{cursor:grabbing;}
+
+.hc{position:absolute;width:24px;height:24px;pointer-events:none;z-index:50;}
+.hc::before,.hc::after{content:'';position:absolute;background:rgba(255,255,255,.3);}
+.hc::before{width:100%;height:1px;top:0;left:0;}
+.hc::after{width:1px;height:100%;top:0;left:0;}
+.hc.tr{top:0;right:0;transform:scaleX(-1);}
+.hc.bl{bottom:0;left:0;transform:scaleY(-1);}
+.hc.br{bottom:0;right:0;transform:scale(-1,-1);}
+.hc.tl{top:0;left:0;}
+
+#title{
+  position:absolute;top:-2.8rem;left:50%;transform:translateX(-50%);
+  white-space:nowrap;
+  font-family:'Montserrat',sans-serif;
+  font-size:clamp(.55rem,1.3vw,.78rem);font-weight:700;letter-spacing:.32em;
+  color:rgba(255,255,255,.3);z-index:60;text-transform:uppercase;
+}
+#status{
+  position:absolute;bottom:-2.3rem;left:50%;transform:translateX(-50%);
+  display:flex;gap:1.5rem;align-items:center;
+  font-size:.48rem;letter-spacing:.12em;font-weight:500;
+  color:rgba(255,255,255,.2);white-space:nowrap;z-index:60;text-transform:uppercase;
+}
+.ldot{width:5px;height:5px;border-radius:50%;background:#fff;opacity:.45;animation:bl 1.8s ease-in-out infinite;}
+@keyframes bl{0%,100%{opacity:.45}50%{opacity:.08}}
+
+/* Pin labels */
+.pin-label{
+  position:absolute;pointer-events:none;
+  z-index:80;transition:opacity .2s;
+}
+/* Saudi Aramco: card fans to the LEFT */
+.pin-label.left { transform:translate(-100%, -100%); }
+/* QAFCO: card fans to the RIGHT */
+.pin-label.right { transform:translate(0%, -100%); }
+.pin-label.clickable{pointer-events:auto;cursor:pointer;}
+.pin-inner{display:flex;align-items:flex-start;gap:7px;}
+.pin-vert{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.pin-ring{
+  width:12px;height:12px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.65);
+  display:flex;align-items:center;justify-content:center;
+  animation:rp 2.6s ease-in-out infinite;flex-shrink:0;
+}
+.pin-core{width:4px;height:4px;border-radius:50%;background:#fff;}
+.pin-stem{width:1px;height:16px;background:linear-gradient(to bottom,rgba(255,255,255,.3),transparent);margin-top:2px;}
+@keyframes rp{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.9);opacity:.25}}
+.pin-card{
+  background:rgba(0,0,0,.75);
+  border:1px solid rgba(255,255,255,.09);
+  border-left:1px solid rgba(255,255,255,.42);
+  padding:6px 12px;line-height:1.55;
+  backdrop-filter:blur(16px);white-space:nowrap;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%);
+  transition:border-color .2s,background .2s;
+}
+.pin-label.clickable:hover .pin-card{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.06);}
+.pin-card .org{font-weight:700;font-size:.62rem;letter-spacing:.06em;color:#fff;text-transform:uppercase;}
+.pin-card .sub{color:rgba(255,255,255,.5);font-size:.55rem;font-weight:400;margin-top:1px;}
+.pin-card .city{color:rgba(255,255,255,.26);font-size:.5rem;font-weight:300;}
+.pin-card .hint{font-size:.47rem;letter-spacing:.07em;color:rgba(255,255,255,.3);margin-top:3px;border-top:1px solid rgba(255,255,255,.07);padding-top:3px;font-weight:500;}
+
+/* Modal */
+#mb-bh{
+  position:fixed;inset:0;background:rgba(0,0,0,0);z-index:900;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .35s ease;pointer-events:none;
+}
+#mb-bh.open{background:rgba(0,0,0,.82);pointer-events:auto;backdrop-filter:blur(12px);}
+#modal-bh{
+  position:relative;width:min(92vw,540px);
+  background:rgba(4,4,6,.97);border:1px solid rgba(255,255,255,.12);
+  opacity:0;transform:translateY(20px) scale(.97);
+  transition:opacity .3s ease,transform .3s ease;pointer-events:none;
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));
+}
+#mb-bh.open #modal-bh{opacity:1;transform:none;pointer-events:auto;}
+#modal-bh::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.009) 3px,rgba(255,255,255,.009) 4px);}
+#mb-aramco{
+  position:fixed;inset:0;background:rgba(0,0,0,0);z-index:900;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .35s ease;pointer-events:none;
+}
+#mb-aramco.open{background:rgba(0,0,0,.82);pointer-events:auto;backdrop-filter:blur(12px);}
+#modal-aramco{
+  position:relative;width:min(92vw,560px);
+  background:rgba(4,4,6,.97);border:1px solid rgba(255,255,255,.12);
+  opacity:0;transform:translateY(20px) scale(.97);
+  transition:opacity .3s ease,transform .3s ease;pointer-events:none;
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));
+}
+#mb-aramco.open #modal-aramco{opacity:1;transform:none;pointer-events:auto;}
+#modal-aramco::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.009) 3px,rgba(255,255,255,.009) 4px);}
+#mb{
+  position:fixed;inset:0;background:rgba(0,0,0,0);z-index:900;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .35s ease;pointer-events:none;
+}
+#mb.open{background:rgba(0,0,0,.82);pointer-events:auto;backdrop-filter:blur(12px);}
+#modal{
+  position:relative;width:min(92vw,540px);
+  background:rgba(4,4,6,.97);border:1px solid rgba(255,255,255,.12);
+  opacity:0;transform:translateY(20px) scale(.97);
+  transition:opacity .3s ease,transform .3s ease;pointer-events:none;
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));
+}
+#mb.open #modal{opacity:1;transform:none;pointer-events:auto;}
+#modal::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.009) 3px,rgba(255,255,255,.009) 4px);}
+
+.mh{padding:22px 28px 15px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.mtag{font-size:.44rem;letter-spacing:.2em;color:rgba(255,255,255,.28);margin-bottom:6px;font-weight:600;text-transform:uppercase;}
+.mtitle{font-family:'Montserrat',sans-serif;font-size:clamp(.9rem,3vw,1.15rem);font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase;}
+.mcls{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:600;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-top:2px;transition:border-color .2s,color .2s;}
+.mcls:hover{border-color:rgba(255,255,255,.5);color:#fff;}
+
+.mbody{padding:22px 28px 26px;display:flex;flex-direction:column;gap:18px;}
+.mrow{display:flex;gap:16px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.05);opacity:0;transform:translateY(10px);transition:opacity .4s ease,transform .4s ease;}
+.mrow:last-child{border-bottom:none;padding-bottom:0;}
+#mb.open .mrow:nth-child(1),#mb-aramco.open .mrow:nth-child(1),#mb-bh.open .mrow:nth-child(1){opacity:1;transform:none;transition-delay:.16s;}
+#mb.open .mrow:nth-child(2),#mb-aramco.open .mrow:nth-child(2),#mb-bh.open .mrow:nth-child(2){opacity:1;transform:none;transition-delay:.26s;}
+#mb.open .mrow:nth-child(3),#mb-aramco.open .mrow:nth-child(3),#mb-bh.open .mrow:nth-child(3){opacity:1;transform:none;transition-delay:.36s;}
+
+.mnum{
+  font-family:'Montserrat',sans-serif;
+  font-size:clamp(1.3rem,4.5vw,1.75rem);font-weight:900;
+  color:#fff;letter-spacing:-.03em;line-height:1;
+  flex-shrink:0;min-width:96px;text-align:right;padding-top:2px;
+}
+.mnum span{font-size:.48em;color:rgba(255,255,255,.4);letter-spacing:.02em;font-weight:600;}
+.mdiv{width:1px;background:rgba(255,255,255,.08);align-self:stretch;flex-shrink:0;}
+.mtxt{flex:1;line-height:1.65;}
+.mtxt strong{display:block;font-size:.52rem;letter-spacing:.14em;color:rgba(255,255,255,.32);margin-bottom:5px;text-transform:uppercase;font-weight:700;}
+.mtxt p{font-size:.62rem;color:rgba(255,255,255,.72);font-weight:400;}
+
+.mft{padding:11px 28px;border-top:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:8px;}
+.mftag{font-size:.43rem;letter-spacing:.16em;color:rgba(255,255,255,.2);font-weight:600;text-transform:uppercase;}
+.mfl{flex:1;height:1px;background:rgba(255,255,255,.05);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="title">Interactive World Map</div>
+  <div class="hc tl"></div><div class="hc tr"></div>
+  <div class="hc bl"></div><div class="hc br"></div>
+  <canvas id="c-main"></canvas>
+  <div id="status">
+    <div class="ldot"></div>
+    <span>Live Tracking</span><span>·</span>
+    <span>Nodes: 02</span><span>·</span>
+    <span id="coords">Drag to Rotate</span>
+  </div>
+</div>
+
+<div id="mb-bh">
+  <div id="modal-bh">
+    <div class="mh">
+      <div>
+        <div class="mtag">Baker Hughes · Houston, Texas, USA</div>
+        <div class="mtitle">Baker Hughes</div>
+      </div>
+      <button class="mcls" id="mcls-bh">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="mrow">
+        <div class="mnum">120<span>+yrs</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Energy Technology Leader</strong>
+          <p>Baker Hughes is a global energy technology company delivering solutions that help make energy safer, cleaner, and more efficient across the energy value chain.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">55k<span>+emp</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Global Workforce</strong>
+          <p>With over 55,000 employees operating in more than 120 countries, Baker Hughes supports upstream, midstream, and downstream energy operations worldwide.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">IET<span>&amp;OFS</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Two Core Segments</strong>
+          <p>Industrial &amp; Energy Technology (IET) and Oilfield Services &amp; Equipment (OFS) — delivering turbomachinery, drilling, completions, and digital solutions.</p>
+        </div>
+      </div>
+    </div>
+    <div class="mft">
+      <div class="mftag">Houston, Texas · USA</div>
+      <div class="mfl"></div>
+      <div class="mftag">Energy Technology</div>
+    </div>
+  </div>
+</div>
+
+<div id="mb-aramco">
+  <div id="modal-aramco">
+    <div class="mh">
+      <div>
+        <div class="mtag">Saudi Aramco · Dhahran, Eastern Province, Saudi Arabia</div>
+        <div class="mtitle">Master Gas System (MGS)</div>
+      </div>
+      <button class="mcls" id="mcls-aramco">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="mrow">
+        <div class="mnum">1<span>of 1</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>World's Largest Gas Network</strong>
+          <p>One of the world's largest gas networks, spanning the Eastern Province of Saudi Arabia and beyond.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">1977<span>est</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Established</strong>
+          <p>Commissioned in 1977, the MGS eliminated gas flaring and monetised previously wasted associated gas across the Kingdom.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">KSA<span>east</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Location</strong>
+          <p>Headquartered in Dhahran, located in the Eastern Province of Saudi Arabia — the heart of the Kingdom's energy infrastructure.</p>
+        </div>
+      </div>
+    </div>
+    <div class="mft">
+      <div class="mftag">Eastern Province · Saudi Arabia</div>
+      <div class="mfl"></div>
+      <div class="mftag">Energy Infrastructure</div>
+    </div>
+  </div>
+</div>
+
+<div id="mb">
+  <div id="modal">
+    <div class="mh">
+      <div>
+        <div class="mtag">QAFCO · Qatar Fertiliser Company · Mesaieed</div>
+        <div class="mtitle">Outcome</div>
+      </div>
+      <button class="mcls" id="mcls">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="mrow">
+        <div class="mnum">+0.8<span>%</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Daily Ammonia Production</strong>
+          <p>By translating complex AI setpoints into actionable operator insights, the system achieved a consistent uplift in site-wide output.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">3–5<span>%</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Reduction in Energy Consumption</strong>
+          <p>Real-time optimization of the Steam-to-Carbon ratio allowed QAFCO to hit sustainability targets while lowering fuel costs.</p>
+        </div>
+      </div>
+      <div class="mrow">
+        <div class="mnum">566<span>hrs</span></div><div class="mdiv"></div>
+        <div class="mtxt">
+          <strong>Production Hours Saved</strong>
+          <p>Through AI-driven anomaly detection and predictive UX, the system mitigated unplanned downtime over a two-year period.</p>
+        </div>
+      </div>
+    </div>
+    <div class="mft">
+      <div class="mftag">AI-Driven Optimization · 2-Year Period</div>
+      <div class="mfl"></div>
+      <div class="mftag">Energy Infrastructure</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LOCATIONS = [
+  {org:'Saudi Aramco',sub:'Master Gas System (MGS)',city:'Dhahran, Saudi Arabia',lat:26.26,lon:50.15,clickable:true,hint:'↗ Click for Details'},
+  {org:'QAFCO',sub:'Qatar Fertiliser Company',city:'Mesaieed, Qatar',lat:24.98,lon:51.55,clickable:true,hint:'↗ Click for Outcomes'},
+  {org:'Baker Hughes',sub:'Energy Technology Company',city:'Houston, Texas, USA',lat:29.75,lon:-95.37,clickable:true,hint:'↗ Click for Details'},
+];
+
+// ── True GeoJSON world from Natural Earth (fetched at runtime) ─────────────
+// We'll fetch the 110m resolution countries from a public CDN
+const GEOJSON_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+
+const cMain = document.getElementById('c-main');
+const stage = document.getElementById('stage');
+const ctx   = cMain.getContext('2d');
+let cS, DPR = Math.min(devicePixelRatio, 2);
+
+function resize() {
+  cS = stage.clientWidth;
+  cMain.width  = cS * DPR;
+  cMain.height = cS * DPR;
+  cMain.style.width  = cS + 'px';
+  cMain.style.height = cS + 'px';
+}
+resize();
+window.addEventListener('resize', () => { resize(); buildDots(); });
+
+// ── Rotation ──────────────────────────────────────────────────────────────────
+let rotYaw = 2.35, rotPitch = 0.28, zoom = 1;
+let autoSpin = true, dragging = false, lastX = 0, lastY = 0, sweepAngle = 0;
+
+cMain.addEventListener('mousedown', e => { dragging=true; lastX=e.clientX; lastY=e.clientY; autoSpin=false; });
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  rotYaw   += (e.clientX - lastX) * 0.006;
+  rotPitch += (e.clientY - lastY) * 0.006;
+  rotPitch  = Math.max(-1.4, Math.min(1.4, rotPitch));
+  lastX = e.clientX; lastY = e.clientY;
+  document.getElementById('coords').textContent =
+    `Lat ${(-rotPitch*180/Math.PI).toFixed(1)}°  Lon ${((rotYaw*180/Math.PI)%360).toFixed(1)}°`;
+});
+cMain.addEventListener('wheel', e => {
+  zoom = Math.max(0.5, Math.min(2.8, zoom - e.deltaY * 0.001));
+  e.preventDefault();
+}, { passive:false });
+cMain.addEventListener('touchstart', e => { dragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; autoSpin=false; }, {passive:true});
+window.addEventListener('touchend', () => dragging = false);
+window.addEventListener('touchmove', e => {
+  if (!dragging || !e.touches.length) return;
+  rotYaw   += (e.touches[0].clientX - lastX) * 0.006;
+  rotPitch += (e.touches[0].clientY - lastY) * 0.006;
+  rotPitch  = Math.max(-1.4, Math.min(1.4, rotPitch));
+  lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+}, {passive:true});
+
+// ── Project ───────────────────────────────────────────────────────────────────
+function project(lat, lon) {
+  const phi   = (90 - lat) * Math.PI / 180;
+  const theta = (lon + 180) * Math.PI / 180;
+  const bx =  Math.sin(phi) * Math.cos(theta);
+  const by =  Math.cos(phi);
+  const bz =  Math.sin(phi) * Math.sin(theta);
+  const x1 =  bx * Math.cos(rotYaw) + bz * Math.sin(rotYaw);
+  const z1 = -bx * Math.sin(rotYaw) + bz * Math.cos(rotYaw);
+  const y2 =  by * Math.cos(rotPitch) - z1 * Math.sin(rotPitch);
+  const z2 =  by * Math.sin(rotPitch) + z1 * Math.cos(rotPitch);
+  return { x: x1, y: y2, z: z2 };
+}
+
+// ── Dot store: {bx,by,bz,coast} ──────────────────────────────────────────────
+let DOTS = [];
+
+// ── TopoJSON → polygon sampling ───────────────────────────────────────────────
+// We use topojson-client (CDN) to extract geometries, then
+// rasterise a land mask on a 1.2° grid using ray-casting.
+
+function buildDots() {
+  if (!window._geoReady) return; // wait for GeoJSON load
+  const step = 1.2;
+  const landMap = new Map();
+
+  // Sample every step-degree point
+  const lats = [], lons = [];
+  for (let la = -90 + step/2; la < 90; la += step) lats.push(la);
+  for (let lo = -180 + step/2; lo < 180; lo += step) lons.push(lo);
+
+  // Point-in-any-polygon test using the prebuilt rings
+  const rings = window._geoRings;
+
+  function pip(lat, lon) {
+    let inside = false;
+    for (const ring of rings) {
+      const n = ring.length;
+      for (let i = 0, j = n-1; i < n; j = i++) {
+        const [xi, yi] = ring[i], [xj, yj] = ring[j];
+        if (((yi > lat) !== (yj > lat)) &&
+            (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi))
+          inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  lats.forEach(la => {
+    lons.forEach(lo => {
+      landMap.set(`${la},${lo}`, pip(la, lo));
+    });
+  });
+
+  // Build dots with precomputed 3D coords
+  const newDots = [];
+  lats.forEach(la => {
+    lons.forEach(lo => {
+      const land = landMap.get(`${la},${lo}`);
+      // Coast detection
+      let coast = false;
+      if (land) {
+        const ns = [
+          landMap.get(`${(la+step).toFixed(4)},${lo}`) ?? landMap.get(`${Math.round((la+step)*100)/100},${lo}`),
+          landMap.get(`${(la-step).toFixed(4)},${lo}`) ?? landMap.get(`${Math.round((la-step)*100)/100},${lo}`),
+          landMap.get(`${la},${(lo+step).toFixed(4)}`) ?? landMap.get(`${la},${Math.round((lo+step)*100)/100}`),
+          landMap.get(`${la},${(lo-step).toFixed(4)}`) ?? landMap.get(`${la},${Math.round((lo-step)*100)/100}`),
+        ];
+        coast = ns.some(v => v === false || v === undefined);
+      }
+      const phi   = (90 - la) * Math.PI / 180;
+      const theta = (lo + 180) * Math.PI / 180;
+      newDots.push({
+        bx: Math.sin(phi) * Math.cos(theta),
+        by: Math.cos(phi),
+        bz: Math.sin(phi) * Math.sin(theta),
+        land, coast,
+      });
+    });
+  });
+  DOTS = newDots;
+}
+
+// ── Load TopoJSON world atlas ─────────────────────────────────────────────────
+(async () => {
+  try {
+    // Load topojson-client
+    await loadScript('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
+    const res = await fetch(GEOJSON_URL);
+    const topo = await res.json();
+
+    // Extract all polygon rings as [lon, lat] arrays
+    const geo = topojson.feature(topo, topo.objects.countries);
+    const rings = [];
+
+    geo.features.forEach(f => {
+      const geom = f.geometry;
+      if (!geom) return;
+      const extract = coords => {
+        // coords is array of rings, each ring is [[lon,lat],...]
+        coords.forEach(ring => rings.push(ring));
+      };
+      if (geom.type === 'Polygon') extract(geom.coordinates);
+      else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => extract(poly));
+    });
+
+    window._geoRings = rings;
+    window._geoReady = true;
+    buildDots();
+    console.log(`GeoJSON loaded. Rings: ${rings.length}, Dots built.`);
+  } catch(e) {
+    console.error('GeoJSON load failed, falling back to built-in', e);
+    useFallback();
+  }
+})();
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// ── Fallback: built-in land polygons if CDN fails ────────────────────────────
+function useFallback() {
+  const FALLBACK = [
+    [[-168,71],[-166,68],[-163,63],[-160,60],[-152,58],[-145,60],[-140,60],[-135,57],[-130,55],[-126,50],[-124,49],[-124,42],[-122,37],[-118,34],[-117,32],[-110,24],[-104,19],[-97,22],[-97,26],[-90,16],[-86,12],[-83,10],[-80,8],[-77,8],[-72,12],[-63,10],[-60,6],[-58,1],[-50,0],[-37,0],[-35,-5],[-35,-8],[-43,-23],[-50,-29],[-56,-52],[-68,-54],[-65,-45],[-65,-32],[-65,-28],[-65,-22],[-68,-22],[-70,-18],[-73,-5],[-75,1],[-77,8]],
+    [[-60,47],[-64,48],[-66,50],[-72,52],[-80,52],[-84,48],[-80,44],[-76,44],[-72,45],[-70,47],[-60,47]],
+    [[-78,62],[-82,62],[-86,64],[-90,70],[-96,72],[-100,73],[-108,70],[-120,68],[-130,65],[-138,62],[-140,60],[-110,49],[-96,49],[-84,48],[-80,52],[-78,62]],
+    [[-44,83],[-20,83],[-18,77],[-22,70],[-30,68],[-44,65],[-52,65],[-58,68],[-60,76],[-44,83]],
+    [[-9,37],[-9,39],[-8,44],[0,43],[3,42],[6,43],[8,44],[10,44],[14,44],[14,46],[16,48],[18,50],[22,50],[24,54],[22,58],[24,60],[28,60],[30,62],[28,66],[26,70],[20,64],[14,55],[8,55],[0,50],[-5,48],[-9,39]],
+    [[28,71],[22,68],[16,58],[5,58],[5,62],[8,65],[15,68],[20,70],[28,71]],
+    [[-5,50],[2,52],[0,58],[-4,58],[-5,55],[-3,52],[-5,50]],
+    [[-18,16],[-15,11],[-10,5],[-4,5],[0,5],[5,5],[10,1],[10,-6],[14,-5],[18,-7],[22,-10],[30,-12],[35,-15],[35,-25],[32,-29],[27,-34],[18,-34],[17,-28],[12,-17],[12,-5],[5,0],[0,5],[-5,5],[-12,5],[-15,10],[-18,16]],
+    [[44,-12],[47,-13],[50,-17],[50,-25],[46,-25],[43,-20],[44,-12]],
+    [[28,30],[32,31],[35,33],[36,37],[38,38],[42,37],[44,33],[46,30],[48,28],[50,24],[56,22],[58,22],[60,22],[57,21],[52,17],[48,13],[44,12],[42,12],[40,12],[38,12],[38,16],[40,20],[42,22],[44,24],[46,26],[48,28],[48,30],[46,30],[44,32],[42,37],[38,38],[36,38],[34,37],[32,36],[30,33],[28,30]],
+    [[26,40],[28,41],[36,37],[38,38],[42,37],[44,40],[40,42],[36,43],[34,37],[26,40]],
+    [[44,39],[46,40],[54,28],[60,22],[64,26],[64,30],[62,36],[58,40],[52,40],[48,38],[46,40],[44,39]],
+    [[62,22],[72,22],[76,14],[80,10],[80,16],[78,20],[78,28],[68,28],[63,25],[62,22]],
+    [[98,10],[100,13],[105,15],[110,15],[116,12],[120,8],[120,4],[114,2],[110,1],[106,1],[104,1],[102,2],[100,4],[100,10],[98,10]],
+    [[100,4],[104,-2],[104,-6],[102,-8],[98,0],[96,4],[100,4]],
+    [[106,-6],[116,-8],[116,-6],[110,-6],[106,-6]],
+    [[110,2],[118,6],[118,2],[116,0],[114,-4],[110,0],[110,2]],
+    [[100,24],[106,22],[114,22],[118,24],[122,25],[126,28],[130,30],[138,35],[140,40],[138,44],[130,48],[122,54],[110,54],[100,52],[96,56],[90,56],[84,56],[80,62],[76,68],[60,74],[52,72],[48,70],[40,70],[34,68],[40,67],[48,68],[52,67],[55,65],[58,62],[60,56],[66,60],[68,62],[72,66],[76,68],[80,70],[88,72],[100,72],[110,72],[120,70],[130,68],[140,66],[150,60],[162,52],[158,50],[150,46],[142,44],[136,48],[130,48],[128,52],[118,54],[100,54],[84,56],[80,62],[52,52],[50,46],[52,40],[58,40],[62,36],[64,30],[66,28],[68,26],[72,22],[100,24]],
+    [[126,34],[130,36],[130,38],[124,38],[124,36],[126,34]],
+    [[130,31],[134,34],[138,36],[140,38],[141,43],[140,44],[132,43],[130,33],[130,31]],
+    [[114,-22],[118,-20],[122,-18],[124,-14],[136,-12],[144,-14],[152,-24],[152,-28],[148,-38],[142,-38],[134,-36],[130,-34],[122,-34],[114,-28],[114,-22]],
+    [[172,-40],[174,-38],[175,-36],[170,-34],[168,-38],[166,-40],[168,-44],[168,-46],[170,-44],[172,-40]],
+  ];
+  // Convert [lon,lat] to the ring format expected by pip ([lon,lat])
+  window._geoRings = FALLBACK.map(ring => ring.map(([lon,lat]) => [lon,lat]));
+  window._geoReady = true;
+  buildDots();
+}
+
+// ── Pin labels ────────────────────────────────────────────────────────────────
+const labelEls = [];
+LOCATIONS.forEach((loc, i) => {
+  const el = document.createElement('div');
+  const dir = i === 0 ? ' left' : i === 2 ? ' left' : ' right';
+  el.className = 'pin-label' + dir + (loc.clickable ? ' clickable' : '');
+  const hint = loc.hint ? `<div class="hint">${loc.hint}</div>` : '';
+  el.innerHTML = `
+    <div class="pin-inner">
+      <div class="pin-vert">
+        <div class="pin-ring"><div class="pin-core"></div></div>
+        <div class="pin-stem"></div>
+      </div>
+      <div class="pin-card">
+        <div class="org">${loc.org}</div>
+        <div class="sub">${loc.sub}</div>
+        <div class="city">${loc.city}</div>
+        ${hint}
+      </div>
+    </div>`;
+  if (loc.clickable) {
+    const modalId = i === 0 ? 'mb-aramco' : i === 2 ? 'mb-bh' : 'mb';
+    el.addEventListener('click', () => document.getElementById(modalId).classList.add('open'));
+  }
+  stage.appendChild(el);
+  labelEls.push(el);
+});
+
+const mbAramco = document.getElementById('mb-aramco');
+const mbBH = document.getElementById('mb-bh');
+document.getElementById('mcls-bh').addEventListener('click', closeAllModals);
+mbBH.addEventListener('click', e => { if (e.target === mbBH) closeAllModals(); });
+
+function closeAllModals() {
+  mb.classList.remove('open');
+  mbAramco.classList.remove('open');
+  mbBH.classList.remove('open');
+  autoSpin = true;
+}
+
+document.getElementById('mcls-aramco').addEventListener('click', closeAllModals);
+mbAramco.addEventListener('click', e => { if (e.target === mbAramco) closeAllModals(); });
+
+const mb = document.getElementById('mb');
+document.getElementById('mcls').addEventListener('click', closeAllModals);
+mb.addEventListener('click', e => { if (e.target === mb) closeAllModals(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+
+// ── Arc ───────────────────────────────────────────────────────────────────────
+function drawArc(p0, p1, CX, CY, R, t) {
+  if (p0.z < 0 || p1.z < 0) return;
+  const x0=CX+p0.x*R, y0=CY-p0.y*R, x1=CX+p1.x*R, y1=CY-p1.y*R;
+  const mx=(x0+x1)/2, my=(y0+y1)/2;
+  const dx=mx-CX, dy=my-CY, d=Math.hypot(dx,dy)||1;
+  const cx2=mx-(dx/d)*0.12*R, cy2=my-(dy/d)*0.12*R;
+  ctx.save();
+  ctx.setLineDash([4,8]); ctx.lineDashOffset = -t*12%20;
+  ctx.strokeStyle='rgba(255,255,255,0.22)'; ctx.lineWidth=0.8;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.quadraticCurveTo(cx2,cy2,x1,y1); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+let lastT = 0;
+function render(ts) {
+  requestAnimationFrame(render);
+  const dt = (ts - lastT) * 0.001; lastT = ts;
+  if (autoSpin) rotYaw += 0.0012;
+  sweepAngle += dt * 0.42;
+
+  const W=cMain.width, H=cMain.height;
+  const CX=W/2, CY=H/2;
+  const R=(W/2)*zoom*0.93;
+  const t=ts*0.001;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,W*0.7);
+  bg.addColorStop(0,'#0d0d14'); bg.addColorStop(.5,'#080810'); bg.addColorStop(1,'#030306');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  // Globe sphere
+  ctx.save();
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2);
+  const sp=ctx.createRadialGradient(CX-R*.12,CY-R*.12,0,CX,CY,R);
+  sp.addColorStop(0,'rgba(20,20,32,0.95)'); sp.addColorStop(.6,'rgba(10,10,18,0.97)'); sp.addColorStop(1,'rgba(3,3,6,0.99)');
+  ctx.fillStyle=sp; ctx.fill(); ctx.restore();
+
+  // Clip
+  ctx.save();
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2); ctx.clip();
+
+  // Sweep
+  ctx.save();
+  ctx.translate(CX,CY); ctx.rotate(sweepAngle);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-Math.PI*0.22,0); ctx.closePath();
+  const wg=ctx.createLinearGradient(0,0,R,0);
+  wg.addColorStop(0,'rgba(255,255,255,0)'); wg.addColorStop(.6,'rgba(255,255,255,0.012)'); wg.addColorStop(1,'rgba(255,255,255,0.05)');
+  ctx.fillStyle=wg; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0);
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=0.6; ctx.stroke();
+  ctx.restore();
+
+  // Grid lines
+  ctx.save();
+  for (let lon=-180; lon<=180; lon+=30) {
+    ctx.beginPath(); let f=true;
+    for (let lat=-88; lat<=88; lat+=2) {
+      const q=project(lat,lon);
+      if(q.z<0){f=true;continue;}
+      f?ctx.moveTo(CX+q.x*R,CY-q.y*R):ctx.lineTo(CX+q.x*R,CY-q.y*R); f=false;
+    }
+    ctx.strokeStyle='rgba(255,255,255,0.042)'; ctx.lineWidth=0.45; ctx.stroke();
+  }
+  for (let lat=-60; lat<=90; lat+=30) {
+    ctx.beginPath(); let f=true;
+    for (let lon=-180; lon<=181; lon+=2) {
+      const q=project(lat,lon);
+      if(q.z<0){f=true;continue;}
+      f?ctx.moveTo(CX+q.x*R,CY-q.y*R):ctx.lineTo(CX+q.x*R,CY-q.y*R); f=false;
+    }
+    ctx.strokeStyle='rgba(255,255,255,0.035)'; ctx.lineWidth=0.45; ctx.stroke();
+  }
+  ctx.restore();
+
+  // DOT MATRIX
+  if (DOTS.length > 0) {
+    const sm = sweepAngle % (Math.PI*2);
+    const ds = R / 380;
+
+    DOTS.forEach(d => {
+      const x1 =  d.bx*Math.cos(rotYaw) + d.bz*Math.sin(rotYaw);
+      const z1 = -d.bx*Math.sin(rotYaw) + d.bz*Math.cos(rotYaw);
+      const y2 =  d.by*Math.cos(rotPitch) - z1*Math.sin(rotPitch);
+      const z2 =  d.by*Math.sin(rotPitch) + z1*Math.cos(rotPitch);
+      if (z2 < -0.01) return;
+
+      const sx=CX+x1*R, sy=CY-y2*R;
+      const depth=Math.pow(Math.max(0,z2+0.01),0.32);
+      const pa=Math.atan2(-y2,x1);
+      const diff=(pa-sm+Math.PI*6)%(Math.PI*2);
+      const sw=diff<0.16?(0.16-diff)/0.16:0;
+
+      if (d.coast) {
+        const a=Math.min(1,(0.82+sw*0.18)*depth);
+        const gr=(0.95+sw*0.7)*ds;
+        const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,gr*4.5);
+        grd.addColorStop(0,`rgba(255,255,255,${(0.22+sw*0.3)*depth})`);
+        grd.addColorStop(0.35,`rgba(255,255,255,${(0.08+sw*0.12)*depth})`);
+        grd.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.beginPath(); ctx.arc(sx,sy,gr*4.5,0,Math.PI*2);
+        ctx.fillStyle=grd; ctx.fill();
+        ctx.beginPath(); ctx.arc(sx,sy,Math.max(0.4,gr),0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.fill();
+      } else if (d.land) {
+        const a=Math.min(1,(0.38+sw*0.38)*depth);
+        const gr=(0.62+sw*0.5)*ds;
+        if (sw>0.05) {
+          const grd=ctx.createRadialGradient(sx,sy,0,sx,sy,gr*3.5);
+          grd.addColorStop(0,`rgba(255,255,255,${(0.1+sw*0.15)*depth})`);
+          grd.addColorStop(1,'rgba(255,255,255,0)');
+          ctx.beginPath(); ctx.arc(sx,sy,gr*3.5,0,Math.PI*2);
+          ctx.fillStyle=grd; ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(sx,sy,Math.max(0.3,gr),0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.fill();
+      } else {
+        const a=(0.065+sw*0.1)*depth;
+        const gr=(0.38+sw*0.25)*ds;
+        ctx.beginPath(); ctx.arc(sx,sy,Math.max(0.2,gr),0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.fill();
+      }
+    });
+  } else {
+    // Loading indicator
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.font=`${14*DPR}px Montserrat,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('Loading map data…', CX, CY);
+  }
+
+  ctx.restore(); // end clip
+
+  // Rim
+  const rim=ctx.createRadialGradient(CX,CY,R*0.86,CX,CY,R*1.02);
+  rim.addColorStop(0,'rgba(255,255,255,0)'); rim.addColorStop(.8,'rgba(255,255,255,0)');
+  rim.addColorStop(.92,'rgba(255,255,255,0.065)'); rim.addColorStop(1,'rgba(255,255,255,0.22)');
+  ctx.beginPath(); ctx.arc(CX,CY,R*1.02,0,Math.PI*2); ctx.fillStyle=rim; ctx.fill();
+
+  // Specular
+  ctx.save();
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2); ctx.clip();
+  const spec=ctx.createRadialGradient(CX-R*0.3,CY-R*0.3,0,CX-R*0.3,CY-R*0.3,R*0.6);
+  spec.addColorStop(0,'rgba(255,255,255,0.06)'); spec.addColorStop(.5,'rgba(255,255,255,0.02)'); spec.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=spec; ctx.fillRect(0,0,W,H); ctx.restore();
+
+  // Dashed ring
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=0.8; ctx.setLineDash([3,10]);
+  ctx.beginPath(); ctx.arc(CX,CY,R*1.055,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+
+  // Arc
+  const ps=LOCATIONS.map(l=>project(l.lat,l.lon));
+  if(ps.length>=2) drawArc(ps[0],ps[1],CX,CY,R,t);
+  if(ps.length>=3) drawArc(ps[1],ps[2],CX,CY,R,t);
+  if(ps.length>=3) drawArc(ps[0],ps[2],CX,CY,R,t);
+
+  // Pins
+  LOCATIONS.forEach((loc,i)=>{
+    const q=project(loc.lat,loc.lon);
+    const alpha=q.z>.05?Math.min(1,q.z*2.5):0;
+    const sx=CX+q.x*R, sy=CY-q.y*R;
+    if(q.z>.05){
+      const pulse=1+0.55*Math.sin(t*2.2+i*1.8);
+      const rg=ctx.createRadialGradient(sx,sy,0,sx,sy,14*pulse);
+      rg.addColorStop(0,`rgba(255,255,255,${0.9*alpha})`);
+      rg.addColorStop(0.22,`rgba(255,255,255,${0.32*alpha})`);
+      rg.addColorStop(0.55,`rgba(255,255,255,${0.07*alpha})`);
+      rg.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.beginPath(); ctx.arc(sx,sy,14*pulse,0,Math.PI*2); ctx.fillStyle=rg; ctx.fill();
+      ctx.beginPath(); ctx.arc(sx,sy,2.8*DPR,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${alpha})`; ctx.fill();
+    }
+    labelEls[i].style.opacity=alpha.toFixed(2);
+    const dx=(cS/2)+q.x*(cS/2)*zoom*0.93;
+    const dy=(cS/2)-q.y*(cS/2)*zoom*0.93;
+    // i=0 Saudi Aramco: left fan  i=1 QAFCO: right fan  i=2 Baker Hughes: left fan
+    const offsetX = i === 1 ? 8 : -8;
+    const offsetY = i === 0 ? -8 : i === 2 ? -8 : -40;
+    labelEls[i].style.left=(dx+offsetX)+'px';
+    labelEls[i].style.top=(dy+offsetY)+'px';
+  });
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
